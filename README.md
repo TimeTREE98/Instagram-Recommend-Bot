@@ -9,4 +9,5 @@ Python Selenium Crawling Project
 ```pip install selenium```
 
 ChangeLog
+- 210216 함수 기반 > 클래스 기반으로 변경, 로그인 처리 구축 완료
 - 210216 첫 커밋, 추천 유저 크롤링하여 점수 부여 구축

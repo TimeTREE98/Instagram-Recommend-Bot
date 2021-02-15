@@ -11,6 +11,21 @@ from selenium.webdriver.support import expected_conditions as EC
 import element as elem
 
 
+def getNumber(val):
+    if "천" in val:
+        return int(float(val[:-1])) * 1000
+    elif "백만" in val:
+        return int(float(val[:-2])) * 1000000
+    elif "십만" in val:
+        return int(float(val[:-2])) * 100000
+    elif "만" in val:
+        return int(float(val[:-1])) * 10000
+    ## 그 이상 조건 추가 필요
+    else:
+        val = int(val.replace(",", ""))
+        return val
+
+
 class instagramBot:
     def __init__(self):  # Auth, Keyword, Driver Setting
         self.myId = ""
@@ -60,7 +75,7 @@ class instagramBot:
         else:
             return True  # is Login
 
-    def login(self):
+    def login(self):  # Login
         startTime = time.time()
         loginIdInput = self.waitForFind("xpath", elem.loginIdInput, 3)
         loginIdInput.send_keys(self.myId)
@@ -75,10 +90,29 @@ class instagramBot:
             print("로그인 시도", end=" | ")
             print("걸린 시간 : ", time.time() - startTime)
 
+    def getUserInfo(self, getType, userId):
+        startTime = time.time()
+        userType = self.waitForFind("xpath", elem.PrivateMsg, 2)  # False 일 경우, Follow, Follower 버튼 a 태그 미 존재
+        if getType == "move":  # URL 처리 해야되는 작업
+            self.driver.get("https://www.instagram.com/" + userId)
+        intro = self.waitForFind("xpath", elem.userInfo, 5) and self.waitForFind("xpath", elem.userInfo, 5).text or ""  # User Intro
+        postCnt = getNumber(self.waitForFind("xpath", elem.postCnt, 3).text)  # 게시물 개수
+        if self.waitForFind("xpath", elem.followCnt, 3):
+            followCnt = getNumber(self.waitForFind("xpath", elem.followCnt, 3).text)
+            followerCnt = getNumber(self.waitForFind("xpath", elem.followerCnt, 3).text)
+        else:
+            followCnt = getNumber(self.waitForFind("xpath", elem.followCnt_un, 3).text)
+            followerCnt = getNumber(self.waitForFind("xpath", elem.followerCnt_un, 3).text)
+        return {
+            "intro": intro,
+            "postCnt": postCnt,
+            "followCnt": followCnt,
+            "followerCnt": followerCnt,
+        }
+
     def start(self):
         if not self.loginChk():
             self.login()
-        print("로그인 프로세스 완료!")
 
 
 try:
@@ -89,45 +123,8 @@ except Exception as e:
 
 
 """
-def getNumber(val):
-    if "천" in val:
-        return int(float(val[:-1])) * 1000
-    elif "백만" in val:
-        return int(float(val[:-2])) * 1000000
-    elif "십만" in val:
-        return int(float(val[:-2])) * 100000
-    elif "만" in val:
-        return int(float(val[:-1])) * 10000
-    ## 그 이상 조건 추가 필요
-    else:
-        val = int(val.replace(",", ""))
-        return val
-
-
-def getUserInfo():
-    intro = waitForFind("xpath", elem.userInfo, 5) and waitForFind("xpath", elem.userInfo, 5).text or ""  # User Intro
-    postCnt = getNumber(waitForFind("xpath", elem.postCnt, 3).text)  # 게시물 개수
-    if waitForFind("xpath", elem.followCnt, 3):
-        followCnt = getNumber(waitForFind("xpath", elem.followCnt, 3).text)
-        print(waitForFind("xpath", elem.followerCnt, 3).text)
-        followerCnt = getNumber(waitForFind("xpath", elem.followerCnt, 3).text)
-    else:
-        followCnt = getNumber(waitForFind("xpath", elem.followCnt_un, 3).text)
-        followerCnt = getNumber(waitForFind("xpath", elem.followerCnt_un, 3).text)
-    return {
-        "intro": intro,
-        "postCnt": postCnt,
-        "followCnt": followCnt,
-        "followerCnt": followerCnt,
-    }
-
 
 try:
-    startTime = time.time()
-    loginStatus = loginChk()
-    if not loginStatus:
-        print("로그인 실시")
-        login()
     driver.get("https://www.instagram.com/explore/people/suggested/")
     waitForFind("xpath", elem.suggestUserFollowBtn1, 3)
     for i in range(3):
