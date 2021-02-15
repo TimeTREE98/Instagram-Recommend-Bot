@@ -1,70 +1,94 @@
+import os
+import re
 import time
+import socket
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
-
-import elem
-
-accountId = ""
-accountPw = ""
-myKeywords = []
-
-options = Options()
-# MAC : /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir="~/.chrome_debug"
-options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-options.add_argument(
-    "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
-)
-driver = webdriver.Chrome("./chromedriver", options=options)  # driver Setting
-driver.set_window_position(0, 0)  # Browser Position Setting
-driver.set_window_size(1020, 1000)  # Browser Size Setting
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import element as elem
 
 
-def waitForFind(elemType, elemVal, waitTime):  # Wait for Elem find
-    findStatus = True
-    startTime = time.time()
-    loadingWaitTime = waitTime  # wait time Setting
-    while findStatus:
-        if time.time() - startTime > loadingWaitTime:
-            break
+class instagramBot:
+    def __init__(self):  # Auth, Keyword, Driver Setting
+        self.myId = ""
+        self.myPw = ""
+        self.log = True
+        if not os.path.isfile("./myKeywords"):
+            raise Exception("myKeywords 파일 미 존재")
+        myKeywordFile = open("./myKeywords", "r")
+        self.myKeywords = list(map(lambda x: x[:-1], myKeywordFile.readlines()))
+        myKeywordFile.close()
+        # Debug Chrome 실행 필요
+        # WIN :
+        # MAC : /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir=".chrome_debug"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if not sock.connect_ex(("127.0.0.1", 9222)) == 0:
+            raise Exception("Chrome 미 실행")
+        options = Options()
+        options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+        options.add_argument("User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36")
+        driver = webdriver.Chrome("./chromedriver", options=options)  # Browser Runf
+        driver.set_window_position(0, 0)  # Browser Position Setting
+        driver.set_window_size(1020, 1100)  # Browser Size Setting
+        self.driver = driver
+
+    def waitForFind(self, elemType, elemPath, waitTime):
+        startTime = time.time()
         try:
+            elem = False
             if elemType == "xpath":
-                findElem = driver.find_element_by_xpath(elemVal)
-            if elemType == "xpaths":
-                findElem = driver.find_elements_by_xpath(elemVal)
-            if elemType == "css":
-                findElem = driver.find_element_by_css_selector(elemVal)
-            findStatus = False  # elem Find Success
-        except:
-            findStatus = True  # elem Find Fail
-    if not findStatus:  # True > Find Fail, False > Find Success
-        # print("소요시간 : ", time.time() - startTime)
-        return findElem
-    else:
-        return False
+                elem = WebDriverWait(self.driver, waitTime).until(EC.presence_of_element_located((By.XPATH, elemPath)))
+        finally:
+            if self.log:
+                print("요소 탐색", end=" | ")
+                print("걸린 시간 : ", time.time() - startTime, end=" | ")
+                print("요소 : ", elemPath)
+            return elem
+
+    def loginChk(self):  # Login Check
+        startTime = time.time()
+        self.driver.get("https://www.instagram.com/accounts/login/")
+        loginStatus = self.waitForFind("xpath", elem.loginIdInput, 3)
+        if self.log:
+            print("로그인 검증", end=" | ")
+            print("걸린 시간 : ", time.time() - startTime)
+        if loginStatus:
+            return False  # is Logout
+        else:
+            return True  # is Login
+
+    def login(self):
+        startTime = time.time()
+        loginIdInput = self.waitForFind("xpath", elem.loginIdInput, 3)
+        loginIdInput.send_keys(self.myId)
+        loginPwInput = self.waitForFind("xpath", elem.loginPwInput, 3)
+        loginPwInput.send_keys(self.myPw)
+        loginPwInput.send_keys(Keys.RETURN)
+        if self.waitForFind("xpath", elem.firstNoti, 7):
+            self.waitForFind("xpath", elem.firstNotiBtn, 3).click()
+        self.waitForFind("xpath", elem.profileImg, 3).click()
+        self.waitForFind("xpath", elem.profileBtn, 3).click()
+        if self.log:
+            print("로그인 시도", end=" | ")
+            print("걸린 시간 : ", time.time() - startTime)
+
+    def start(self):
+        if not self.loginChk():
+            self.login()
+        print("로그인 프로세스 완료!")
 
 
-def loginChk():  # Login Check
-    driver.get("https://www.instagram.com/accounts/login/")
-    if waitForFind("xpath", elem.loginIdInput, 5):
-        return False  # Logout Status
-    else:
-        return True  # Login Status
+try:
+    Bot = instagramBot()
+    Bot.start()
+except Exception as e:
+    print(e)
 
 
-def login():  # Login Process
-    driver.get("https://www.instagram.com/")
-    loginIdInput = waitForFind("xpath", elem.loginIdInput, 5)
-    loginIdInput.send_keys(accountId)
-    loginPwInput = waitForFind("xpath", elem.loginPwInput, 5)
-    loginPwInput.send_keys(accountPw)
-    loginPwInput.send_keys(Keys.RETURN)
-    if waitForFind("xpath", elem.firstNoti, 5):
-        waitForFind("xpath", elem.firstNotiBtn, 5).click()
-    waitForFind("xpath", elem.profileImg, 3).click()
-    waitForFind("xpath", elem.profileBtn, 3).click()
-
-
+"""
 def getNumber(val):
     if "천" in val:
         return int(float(val[:-1])) * 1000
@@ -81,11 +105,7 @@ def getNumber(val):
 
 
 def getUserInfo():
-    intro = (
-        waitForFind("xpath", elem.userInfo, 5)
-        and waitForFind("xpath", elem.userInfo, 5).text
-        or ""
-    )  # User Intro
+    intro = waitForFind("xpath", elem.userInfo, 5) and waitForFind("xpath", elem.userInfo, 5).text or ""  # User Intro
     postCnt = getNumber(waitForFind("xpath", elem.postCnt, 3).text)  # 게시물 개수
     if waitForFind("xpath", elem.followCnt, 3):
         followCnt = getNumber(waitForFind("xpath", elem.followCnt, 3).text)
@@ -163,3 +183,4 @@ try:
     print("-" * 30)
 except Exception as e:
     print(e)
+ """
