@@ -7,3 +7,6 @@ Python Selenium Crawling Project
 
 필요 라이브러리 설치
 ```pip install selenium```
+
+ChangeLog
+- 210216 첫 커밋, 추천 유저 크롤링하여 점수 부여 구축
