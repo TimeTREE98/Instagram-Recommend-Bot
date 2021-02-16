@@ -1,5 +1,4 @@
 import os
-import re
 import time
 import socket
 from selenium import webdriver
@@ -56,6 +55,8 @@ class instagramBot:
             elem = False
             if elemType == "xpath":
                 elem = WebDriverWait(self.driver, waitTime).until(EC.presence_of_element_located((By.XPATH, elemPath)))
+            elif elemType == "xpaths":
+                elem = WebDriverWait(self.driver, waitTime).until(EC.presence_of_all_elements_located((By.XPATH, elemPath)))
         finally:
             if self.log:
                 print("요소 탐색", end=" | ")
@@ -92,10 +93,10 @@ class instagramBot:
 
     def getUserInfo(self, getType, userId):
         startTime = time.time()
-        userType = self.waitForFind("xpath", elem.PrivateMsg, 2)  # False 일 경우, Follow, Follower 버튼 a 태그 미 존재
+        userType = self.waitForFind("xpath", elem.PrivateMsg, 3)  # False 일 경우, Follow, Follower 버튼 a 태그 미 존재
         if getType == "move":  # URL 처리 해야되는 작업
             self.driver.get("https://www.instagram.com/" + userId)
-        intro = self.waitForFind("xpath", elem.userInfo, 5) and self.waitForFind("xpath", elem.userInfo, 5).text or ""  # User Intro
+        intro = self.waitForFind("xpath", elem.userInfo, 3) and self.waitForFind("xpath", elem.userInfo, 5).text or ""  # User Intro
         postCnt = getNumber(self.waitForFind("xpath", elem.postCnt, 3).text)  # 게시물 개수
         if self.waitForFind("xpath", elem.followCnt, 3):
             followCnt = getNumber(self.waitForFind("xpath", elem.followCnt, 3).text)
@@ -103,6 +104,9 @@ class instagramBot:
         else:
             followCnt = getNumber(self.waitForFind("xpath", elem.followCnt_un, 3).text)
             followerCnt = getNumber(self.waitForFind("xpath", elem.followerCnt_un, 3).text)
+        if self.log:
+            print("유저 정보 받아오기", end=" | ")
+            print("걸린 시간 : ", time.time() - startTime)
         return {
             "intro": intro,
             "postCnt": postCnt,
@@ -110,74 +114,29 @@ class instagramBot:
             "followerCnt": followerCnt,
         }
 
-    def start(self):
-        if not self.loginChk():
-            self.login()
+    def getScore(self):  # 점수 계산 로직
+        return True
+
+    def suggestUserCrawling(self):  # 추천 유저는 100개까지 로딩됨.
+        startTime = time.time()
+        self.driver.get("https://www.instagram.com/explore/people/suggested/")
+        self.waitForFind("xpath", elem.suggestUserFollowBtn1, 3)
+        for i in range(3):
+            suggestUsers = self.waitForFind("xpaths", elem.suggestUserList, 3)
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", suggestUsers[-1])
+            time.sleep(3)
+        suggestUserList = []
+        suggestUsers = self.waitForFind("xpaths", elem.suggestUserList, 3)
+        suggestUsers = list(map(lambda x: x.text.split("\n")[0], suggestUsers))
+        for idx, userId in enumerate(suggestUsers):
+            userInfo = self.getUserInfo("move", userId)
+            print(userInfo)
 
 
 try:
     Bot = instagramBot()
-    Bot.start()
+    if not Bot.loginChk():
+        Bot.login()
+    Bot.suggestUserCrawling()
 except Exception as e:
     print(e)
-
-
-"""
-
-try:
-    driver.get("https://www.instagram.com/explore/people/suggested/")
-    waitForFind("xpath", elem.suggestUserFollowBtn1, 3)
-    for i in range(3):
-        suggestUsers = waitForFind("xpaths", elem.suggestUserList, 3)
-        driver.execute_script("arguments[0].scrollIntoView(true);", suggestUsers[-1])
-        time.sleep(3)
-    suggestUserList = []
-    suggestUsers = waitForFind("xpaths", elem.suggestUserList, 3)
-    suggestUsers = list(map(lambda x: x.text.split("\n")[0], suggestUsers))
-    for idx, userId in enumerate(suggestUsers):
-        totalScore = 0
-        postScore = 0
-        followScore = 0
-        keywordScore = 0
-        driver.get("https://www.instagram.com/" + userId)
-        userInfo = getUserInfo()
-        postCnt = userInfo["postCnt"]
-        if postCnt > 50:
-            postScore += 0.3
-        elif postCnt > 30:
-            postScore += 0.2
-        elif postCnt > 10:
-            postScore += 0.1
-        followRatio = userInfo["followCnt"] / userInfo["followerCnt"]
-        if followRatio > 1:  # 팔로우, 팔로워 비율에 따른 점수 부여
-            followScore += 1
-        elif followRatio > 0.8:
-            followScore += 0.6
-        elif followRatio > 0.6:
-            followScore += 0.4
-        intro = userInfo["intro"].lower()
-        for keyword in myKeywords:  # 내 키워드에 따른 점수 부여
-            if keyword in intro:
-                keywordScore += 2
-                break
-        totalScore = postScore + followScore + keywordScore
-        print("-" * 30)
-        print(userId)
-        print("   postScore : ", postScore, end=" | ")
-        print("followScore : ", followScore, end=" | ")
-        print("keywordScore : ", keywordScore)
-        print("  totalScore : ", totalScore)
-        if totalScore > 3:
-            suggestUserList.append(userId)
-            print("'" + userId + "' 이 유저를 추천합니다!")
-        elif totalScore > 2.6:
-            print("이 유저도 고려해보세요!")
-        elif totalScore > 2:
-            print("음... 한번 봐도 나쁘지 않을 것 같아요!")
-    print("추천 유저는 아래와 같아요!")
-    for u in suggestUserList:
-        print(u, end=", ")
-    print("-" * 30)
-except Exception as e:
-    print(e)
- """
